@@ -10,6 +10,7 @@
 typedef char bool;
 static const int true = 1;
 static const int false = 0;
+#define KILOBYTE 1024
 #define MEGABYTE (1024 * 1024)
 #define GIGABYTE (1024 * MEGABYTE)
 
@@ -99,11 +100,56 @@ static void show_help(){
     printf(" --medium: set limits to 512MB address space, 512MB data segment, 256 open files\n");
     printf(" --small: set limits to 128MB address space, 128MB data segment, 64 open files\n");
     printf(" --starving: set limits to 16MB address space, 16MB data segment, 16 open files\n");
+    printf(" --memory <size>: set the memory limit to <size>\n");
+    printf(" --data <size>: set the data segment limit to <size>\n");
+    printf(" --files <size>: set the number of open files limit to <size>\n");
     printf(" --verbose: print what the limits are being set to\n");
     printf(" --help: show this help\n");
+    printf("<size> is an integer optionally followed a unit, such as 2k or 3m. 2kb is also ok\n");
     printf("\n");
     printf("Example:\n");
     printf("$ diet --medium /bin/ls -l\n");
+}
+
+/* Convert units to bytes
+ *   5k = 5 * 1024
+ *   5m = 5 * 1024 * 1024
+ *   5mb = 5 * 1024 * 1024
+ */
+static uint64_t convert_size(const char* value, bool* ok){
+    const char* digit = "0123456789";
+    const char* start = value;
+    for (start = value; *start != '\0' && strchr(digit, *start) != NULL; start++);
+
+    if (start == value){
+        printf("'%s' is an invalid size\n", value);
+        *ok = false;
+        return -1;
+    }
+
+    char buffer[256];
+    bzero(buffer, sizeof(buffer));
+    memcpy(buffer, value, start-value);
+    buffer[start-value] = 0;
+
+    uint64_t base = atoi(buffer);
+
+    *ok = true;
+
+    if (strcasecmp(start, "k") == 0 ||
+        strcasecmp(start, "kb") == 0){
+        return base * KILOBYTE;
+    }
+    if (strcasecmp(start, "m") == 0 ||
+        strcasecmp(start, "mb") == 0){
+        return base * MEGABYTE;
+    }
+    if (strcasecmp(start, "g") == 0 ||
+        strcasecmp(start, "gb") == 0){
+        return base * GIGABYTE;
+    }
+
+    return 0;
 }
 
 int main(int argc, char **argv){
@@ -127,14 +173,57 @@ int main(int argc, char **argv){
             plan = DietStarving;
         } else if (strcmp(argv[arg], "--verbose") == 0){
             verbose = true;
+        } else if (strcmp(argv[arg], "--memory") == 0){
+            arg += 1;
+            if (arg < argc){
+                bool ok = false;
+                plan.memory_limit = convert_size(argv[arg], &ok);
+                if (!ok){
+                    return 1;
+                }
+            } else {
+                printf("Error: expected a size argument after --memory\n");
+                return 1;
+            }
+        } else if (strcmp(argv[arg], "--data") == 0){
+            arg += 1;
+            if (arg < argc){
+                bool ok = false;
+                plan.data_limit = convert_size(argv[arg], &ok);
+                if (!ok){
+                    return 1;
+                }
+            } else {
+                printf("Error: expected a size argument after --data\n");
+                return 1;
+            }
+        } else if (strcmp(argv[arg], "--files") == 0){
+            arg += 1;
+            if (arg < argc){
+                bool ok = false;
+                plan.file_limit = convert_size(argv[arg], &ok);
+                if (!ok){
+                    return 1;
+                }
+            } else {
+                printf("Error: expected a size argument after --files\n");
+                return 1;
+            }
         } else if (strcmp(argv[arg], "--help") == 0 ||
                    strcmp(argv[arg], "-h") == 0){
             show_help();
             return 0;
         } else {
+            if (arg == argc){
+                printf("Error: give a program to execute\n");
+                show_help();
+                return 1;
+            }
             run(&plan, verbose, argc - arg, &argv[arg]);
         }
     }
 
-    return run(&plan, verbose, argc - 1, &argv[1]);
+    printf("Error: give a program to execute\n");
+    show_help();
+    return 1;
 }
