@@ -7,6 +7,12 @@
 #include <sys/resource.h>
 #include <stdint.h>
 
+/* TODO
+ * Fork child and set rlimits in the child before execing. Then attach to the child via ptrace to control
+ * how the child behaves when making system calls. For example, we can slow down a system call by putting
+ * a sleep before each system call so the user can feel what a slow system is like.
+ */
+
 typedef char bool;
 static const int true = 1;
 static const int false = 0;
@@ -78,7 +84,7 @@ static void set_diet_plan(struct DietPlan const* diet, bool verbose){
     set_limit("open file", RLIMIT_NOFILE, diet->file_limit, verbose);
 }
 
-static int run(struct DietPlan const * diet, bool verbose, int argc, char **argv){
+static int run(struct DietPlan const * diet, bool verbose, int argc, char **argv, char** envp){
     /*
     set_limit("address space", RLIMIT_AS, 20 * MEGABYTE, true);
     set_limit("data segment", RLIMIT_DATA, 1 * MEGABYTE, true);
@@ -87,7 +93,7 @@ static int run(struct DietPlan const * diet, bool verbose, int argc, char **argv
 
     set_diet_plan(diet, verbose);
 
-    int ok = execv(argv[0], argv);
+    int ok = execvpe(argv[0], argv, envp);
     /* Shouldn't get here */
     printf("Unable to execute '%s'. execve returned %d: %s\n", argv[0], ok, strerror(errno));
     return 1;
@@ -149,10 +155,10 @@ static uint64_t convert_size(const char* value, bool* ok){
         return base * GIGABYTE;
     }
 
-    return 0;
+    return base;
 }
 
-int main(int argc, char **argv){
+int main(int argc, char **argv, char** envp){
     if (argc < 2){
         printf("Error: give a program to execute\n");
         show_help();
@@ -219,7 +225,7 @@ int main(int argc, char **argv){
                 show_help();
                 return 1;
             }
-            run(&plan, verbose, argc - arg, &argv[arg]);
+            run(&plan, verbose, argc - arg, &argv[arg], envp);
         }
     }
 
