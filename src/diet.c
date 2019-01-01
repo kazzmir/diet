@@ -8,9 +8,22 @@
 #include <stdint.h>
 
 typedef char bool;
-const int true = 1;
-const int false = 0;
-const uint64_t MEGABYTE = 1024 * 1024;
+static const int true = 1;
+static const int false = 0;
+#define MEGABYTE (1024 * 1024)
+#define GIGABYTE (1024 * MEGABYTE)
+
+struct DietPlan{
+    uint64_t memory_limit;
+    uint64_t data_limit;
+    uint64_t file_limit;
+};
+
+static const struct DietPlan DietLarge = {
+    .memory_limit = 1 * GIGABYTE,
+    .data_limit = 1 * GIGABYTE,
+    .file_limit = 512
+};
 
 static int set_limit(const char* name, int limit_type, uint64_t limit, bool verbose){
     struct rlimit process_limit;
@@ -40,10 +53,20 @@ static int set_limit(const char* name, int limit_type, uint64_t limit, bool verb
     }
 }
 
-static int run(int argc, char **argv){
+static void set_diet_plan(struct DietPlan const* diet, bool verbose){
+    set_limit("address space", RLIMIT_AS, diet->memory_limit, verbose);
+    set_limit("data segment", RLIMIT_DATA, diet->data_limit, verbose);
+    set_limit("open file", RLIMIT_NOFILE, diet->file_limit, verbose);
+}
+
+static int run(struct DietPlan const * diet, int argc, char **argv){
+    /*
     set_limit("address space", RLIMIT_AS, 20 * MEGABYTE, true);
     set_limit("data segment", RLIMIT_DATA, 1 * MEGABYTE, true);
     set_limit("open file", RLIMIT_NOFILE, 16, true);
+    */
+
+    set_diet_plan(diet, true);
 
     int ok = execv(argv[0], argv);
     /* Shouldn't get here */
@@ -57,5 +80,7 @@ int main(int argc, char **argv){
         return 1;
     }
 
-    return run(argc - 1, &argv[1]);
+    struct DietPlan const * const plan = &DietLarge;
+
+    return run(plan, argc - 1, &argv[1]);
 }
