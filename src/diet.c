@@ -7,28 +7,45 @@
 #include <sys/resource.h>
 #include <stdint.h>
 
-static int run(int argc, char **argv){
-    struct rlimit memory_limit;
-    int ok = getrlimit(RLIMIT_AS, &memory_limit);
-    if (ok == 0){
-        printf("Current memory limit:\n");
-        printf("  soft: %lu\n", memory_limit.rlim_cur);
-        printf("  hard: %lu\n", memory_limit.rlim_max);
+typedef char bool;
+const int true = 1;
+const int false = 0;
+const uint64_t MEGABYTE = 1024 * 1024;
 
-        uint64_t limit = 20 * 1024 * 1024;
-        memory_limit.rlim_cur = limit;
-        memory_limit.rlim_max = limit;
-        ok = setrlimit(RLIMIT_AS, &memory_limit);
+static int set_limit(const char* name, int limit_type, uint64_t limit, bool verbose){
+    struct rlimit process_limit;
+    int ok = getrlimit(limit_type, &process_limit);
+    if (ok == 0){
+        if (verbose){
+            printf("Current %s limit:\n", name);
+            printf("  soft: %lu\n", process_limit.rlim_cur);
+            printf("  hard: %lu\n", process_limit.rlim_max);
+        }
+
+        process_limit.rlim_cur = limit;
+        process_limit.rlim_max = limit;
+        ok = setrlimit(limit_type, &process_limit);
         if (ok != 0){
-            printf("Unable to set the memory limit: %d %s\n", ok, strerror(errno));
+            printf("Unable to set the %s limit: %d %s\n", name, ok, strerror(errno));
+            return 1;
         } else {
-            printf("Memory limit set to %lu\n", limit);
+            if (verbose){
+                printf("%s limit set to %lu\n", name, limit);
+            }
+            return 0;
         }
     } else {
-        printf("Unable to get the memory limit: %d %s\n", ok, strerror(errno));
+        printf("Unable to get the %s limit: %d %s\n", name, ok, strerror(errno));
+        return 2;
     }
+}
 
-    ok = execv(argv[0], argv);
+static int run(int argc, char **argv){
+    set_limit("address space", RLIMIT_AS, 20 * MEGABYTE, true);
+    set_limit("data segment", RLIMIT_DATA, 1 * MEGABYTE, true);
+    set_limit("open file", RLIMIT_NOFILE, 16, true);
+
+    int ok = execv(argv[0], argv);
     /* Shouldn't get here */
     printf("Unable to execute '%s'. execve returned %d: %s\n", argv[0], ok, strerror(errno));
     return 1;
