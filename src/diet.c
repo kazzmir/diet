@@ -25,6 +25,24 @@ static const struct DietPlan DietLarge = {
     .file_limit = 512
 };
 
+static const struct DietPlan DietMedium = {
+    .memory_limit = 512 * MEGABYTE,
+    .data_limit = 512 * MEGABYTE,
+    .file_limit = 256
+};
+
+static const struct DietPlan DietSmall = {
+    .memory_limit = 128 * MEGABYTE,
+    .data_limit = 128 * MEGABYTE,
+    .file_limit = 64
+};
+
+static const struct DietPlan DietStarving = {
+    .memory_limit = 16 * MEGABYTE,
+    .data_limit = 16 * MEGABYTE,
+    .file_limit = 16
+};
+
 static int set_limit(const char* name, int limit_type, uint64_t limit, bool verbose){
     struct rlimit process_limit;
     int ok = getrlimit(limit_type, &process_limit);
@@ -80,7 +98,7 @@ int main(int argc, char **argv){
         return 1;
     }
 
-    struct DietPlan const * const plan = &DietLarge;
+    struct DietPlan const * const plan = &DietStarving;
 
     return run(plan, argc - 1, &argv[1]);
 }
