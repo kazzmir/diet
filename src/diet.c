@@ -77,14 +77,14 @@ static void set_diet_plan(struct DietPlan const* diet, bool verbose){
     set_limit("open file", RLIMIT_NOFILE, diet->file_limit, verbose);
 }
 
-static int run(struct DietPlan const * diet, int argc, char **argv){
+static int run(struct DietPlan const * diet, bool verbose, int argc, char **argv){
     /*
     set_limit("address space", RLIMIT_AS, 20 * MEGABYTE, true);
     set_limit("data segment", RLIMIT_DATA, 1 * MEGABYTE, true);
     set_limit("open file", RLIMIT_NOFILE, 16, true);
     */
 
-    set_diet_plan(diet, true);
+    set_diet_plan(diet, verbose);
 
     int ok = execv(argv[0], argv);
     /* Shouldn't get here */
@@ -92,13 +92,49 @@ static int run(struct DietPlan const * diet, int argc, char **argv){
     return 1;
 }
 
+static void show_help(){
+    printf("diet: run programs with reduced resources (via rlimit)\n");
+    printf("diet <option>... <program> <program-arg> ...\n");
+    printf(" --large: set limits to 1GB address space, 1GB data segment, 512 open files. This is the default if no option is specified.\n");
+    printf(" --medium: set limits to 512MB address space, 512MB data segment, 256 open files\n");
+    printf(" --small: set limits to 128MB address space, 128MB data segment, 64 open files\n");
+    printf(" --starving: set limits to 16MB address space, 16MB data segment, 16 open files\n");
+    printf(" --verbose: print what the limits are being set to\n");
+    printf(" --help: show this help\n");
+    printf("\n");
+    printf("Example:\n");
+    printf("$ diet --medium /bin/ls -l\n");
+}
+
 int main(int argc, char **argv){
     if (argc < 2){
-        printf("Give a program to execute\n");
+        printf("Error: give a program to execute\n");
+        show_help();
         return 1;
     }
 
-    struct DietPlan const * const plan = &DietStarving;
+    int arg = 1;
+    bool verbose = false;
+    struct DietPlan plan = DietLarge;
+    for (arg = 1; arg < argc; arg++){
+        if (strcmp(argv[arg], "--large") == 0){
+            plan = DietLarge;
+        } else if (strcmp(argv[arg], "--medium") == 0){
+            plan = DietMedium;
+        } else if (strcmp(argv[arg], "--small") == 0){
+            plan = DietSmall;
+        } else if (strcmp(argv[arg], "--starving") == 0){
+            plan = DietStarving;
+        } else if (strcmp(argv[arg], "--verbose") == 0){
+            verbose = true;
+        } else if (strcmp(argv[arg], "--help") == 0 ||
+                   strcmp(argv[arg], "-h") == 0){
+            show_help();
+            return 0;
+        } else {
+            run(&plan, verbose, argc - arg, &argv[arg]);
+        }
+    }
 
-    return run(plan, argc - 1, &argv[1]);
+    return run(&plan, verbose, argc - 1, &argv[1]);
 }

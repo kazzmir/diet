@@ -1,2 +1,5 @@
 diet: src/diet.c
-	cc src/diet.c -o diet
+	cc -Wall src/diet.c -o diet
+
+clean:
+	rm -f diet
